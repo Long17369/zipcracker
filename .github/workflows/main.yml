@@ -61,7 +61,7 @@ jobs:
       - name: 安装前端依赖
         run: |
           cd frontend
-          npm install[reference:11]
+          npm install
 
       - name: 构建 Wails 应用
         run: wails build -platform ${{ matrix.platform }}
