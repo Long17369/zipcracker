@@ -1,59 +1,70 @@
-name: Build with build.sh
+name: Build ZipCracker
 
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:          # 手动触发
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]   # 按需保留
+        # 如果您只需要 Linux，可以只保留 ubuntu-latest
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 安装 Go（指定版本，避免脚本再去下载 toolchain）
+      # ---------- Linux 需要安装系统依赖 ----------
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev build-essential
+
+      # ---------- macOS 需要 Xcode ----------
+      # macOS runner 自带 Xcode，无需额外操作
+
+      # ---------- Windows 需要安装 WebView2 运行时 ----------
+      # Windows runner 通常已预装 WebView2，若没有可以添加安装步骤（通常不需要）
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'       # 与您的 go.mod 一致
+          go-version: '1.24.4'    # 与 go.mod 一致，您写的是 1.24.4
           cache: true
 
-      # 安装 Node.js
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'       # 根据您前端使用的版本调整
+          node-version: '18'      # 或 20，按您实际要求
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json   # 若使用 yarn 则改
+          cache-dependency-path: frontend/package-lock.json
 
-      # 安装 Wails CLI（脚本里可能用到 wails 命令）
-      - name: Install Wails
+      - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      # 给脚本加执行权限（Linux/macOS 需要）
-      - name: Make build.sh executable
-        if: runner.os != 'Windows'
-        run: chmod +x ./build.sh
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
 
-      # 运行您的构建脚本
-      - name: Run build.sh
-        run: ./build.sh
-        # Windows 下可以直接 ./build.sh 如果脚本是 bash，需要 Git Bash，建议统一用 bash ./build.sh
-        # 如果 Windows 下没有 bash，可以考虑用 sh ./build.sh 或使用 msys2，但最简单是只保留 Linux 构建。
-        # 若想支持 Windows，建议将脚本改为跨平台或使用 PowerShell，但现有脚本是 bash，所以 Windows runner 可能无法直接运行。
-        # 建议：如果只构建 Linux，就只保留 ubuntu-latest；若要构建 Windows，需要修改脚本为兼容模式或使用 WSL。
-        # 这里假设您只构建 Linux，或者您在 Windows 上用 Git Bash 运行（GitHub Windows runner 默认有 Git Bash 在 PATH 中，可以 bash ./build.sh）
+      - name: Build with Wails
+        # 自动检测平台，也可以显式指定 -platform
+        run: wails build -clean -trimpath
 
-      # 上传构建产物（脚本输出路径通常是 build/bin/ 或当前目录）
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: zipcracker-${{ matrix.os }}
+          # Wails 默认输出到 build/bin/，但也有可能输出到当前目录，具体看 wails.json 配置
+          # 这里同时捕获常见的输出位置
           path: |
             build/bin/
-            zipcracker*        # 如果脚本生成在根目录，也一并捕获
+            zipcracker*
+            *.exe
+            *.dmg
