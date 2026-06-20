@@ -9,13 +9,13 @@ on:
   workflow_dispatch:
 
 env:
-  # 防止构建时内存不足[reference:5][reference:6]
+  # 防止构建时内存不足
   NODE_OPTIONS: "--max-old-space-size=4096"
 
 jobs:
   build:
     strategy:
-      # 一个平台构建失败不影响其他平台[reference:7][reference:8]
+      # 一个平台构建失败不影响其他平台
       fail-fast: false
       matrix:
         include:
@@ -44,7 +44,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24.4'
-          # 自动缓存 Go 模块[reference:9]
+          # 自动缓存 Go 模块
           cache: true
 
       - name: 安装 Node.js
@@ -56,7 +56,7 @@ jobs:
           cache-dependency-path: 'frontend/package-lock.json'
 
       - name: 安装 Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest[reference:10]
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: 安装前端依赖
         run: |
@@ -64,7 +64,7 @@ jobs:
           npm install[reference:11]
 
       - name: 构建 Wails 应用
-        run: wails build -platform ${{ matrix.platform }}[reference:12]
+        run: wails build -platform ${{ matrix.platform }}
 
       - name: 上传构建产物 (Linux)
         if: matrix.os == 'ubuntu-latest'
